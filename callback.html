@@ -64,15 +64,9 @@
       setTimeout(() => window.close(), 1500);
     }
 
-    // Path 1: window.opener available (Figma desktop or non-sandboxed context)
-    if (window.opener) {
-      window.opener.postMessage(payload, "*");
-      finish(!!error);
-      return;
-    }
-
-    // Path 2: Relay via ntfy.sh so the plugin can poll for the result
-    if (state) {
+    function relay() {
+      // Path 2: Relay via ntfy.sh so the plugin can poll for the result
+      if (!state) { finish(true); return; }
       fetch("https://ntfy.sh/fluxa-auth-" + state, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,8 +74,18 @@
       })
         .then(() => finish(!!error))
         .catch(() => finish(true));
+    }
+
+    // Path 1: window.opener available (Figma desktop or non-sandboxed context)
+    if (window.opener) {
+      try {
+        window.opener.postMessage(payload, "*");
+        finish(!!error);
+      } catch (_) {
+        relay();
+      }
     } else {
-      finish(true);
+      relay();
     }
   </script>
 </body>
