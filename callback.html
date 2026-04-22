@@ -25,8 +25,7 @@
       width: 90%;
     }
     .spinner {
-      width: 40px;
-      height: 40px;
+      width: 40px; height: 40px;
       border: 3px solid #e5e7eb;
       border-top-color: #4328fe;
       border-radius: 50%;
@@ -53,21 +52,36 @@
     const state  = params.get("state");
     const error  = params.get("error");
 
-    if (window.opener) {
-      window.opener.postMessage(
-        { type: "oauth_callback", code, state, error },
-        "*"
-      );
+    const payload = { type: "oauth_callback", code, state, error };
+
+    function finish(isError) {
       document.getElementById("spinner").style.display = "none";
-      document.getElementById("title").textContent = error ? "Sign-in failed" : "Signed in!";
-      document.getElementById("title").className   = error ? "error" : "success";
-      document.getElementById("msg").textContent   = error
-        ? (error + " — you can close this window.")
+      document.getElementById("title").textContent = isError ? "Sign-in failed" : "Signed in!";
+      document.getElementById("title").className   = isError ? "error" : "success";
+      document.getElementById("msg").textContent   = isError
+        ? "Something went wrong — you can close this window."
         : "You can close this window now.";
       setTimeout(() => window.close(), 1500);
+    }
+
+    // Path 1: window.opener available (Figma desktop or non-sandboxed context)
+    if (window.opener) {
+      window.opener.postMessage(payload, "*");
+      finish(!!error);
+      return;
+    }
+
+    // Path 2: Relay via ntfy.sh so the plugin can poll for the result
+    if (state) {
+      fetch("https://ntfy.sh/fluxa-auth-" + state, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, error }),
+      })
+        .then(() => finish(!!error))
+        .catch(() => finish(true));
     } else {
-      document.getElementById("title").textContent = "No opener found";
-      document.getElementById("msg").textContent   = "Please open this page from the Figma plugin.";
+      finish(true);
     }
   </script>
 </body>
